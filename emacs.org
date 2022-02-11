@@ -1,0 +1,706 @@
+#+title: Configuración De Emacs
+#+PROPERTY: header-args:emacs-lisp :tangle /home/alberto/.emacs.d/init.el :mkdirp yes
+
+* Inicio
+
+Este es el archivo de configuración de emacs, al guardarse se reescribira automaticamente en [[init.el]] el cual sera leido por emacs cada vez que se inicie.
+
+Esta configuración está basada en [[Emacs From Scratch Configuration]] de David Wilson del canal [[System Crafters]], gracias David por tu serie de videos informativos que me ayudaron a emprender el camino del emacswan.
+
+* Variables
+
+Las siguientes variables sirven para modificar las fuentes de tu sistema, puede que quieras modificarlas para adaptar el tamaño y los tipos a tus preferencias.
+
+Yo uso las fuentes [[Oxygen]], [[OxygenMono]] y [[Cormorant]] en está configuración, las cuales tendrás que instalar en tu máquina si quieres conservar la misma apariencia. También puedes usar otro tipo de fuentes cambiandolas en el codigo de debajo.
+
+#+begin_src emacs-lisp
+
+  ;; NOTA: init.el ha sido generado apartir de emacs.org. Porfavor modifique ese archivo y no este.
+  ;;       al modificar emacs.org, init.el sera regenerado automaticamente!
+
+  ;; Lo más probable es que necesites adaptar el tamaño a tu sistema!
+  (defvar default-font-size 95)
+  (defvar default-variable-font-size 140)
+
+(defvar serif-font "Cormorant")
+(defvar sansserif-font "Oxygen")
+(defvar mono-font "OxygenMono")
+
+#+end_src
+
+* Consejos para usar
+
+En este documento, he añadido enlaces en muchos sitios que te guiaran a la documentación de los varios paquetes que usamos. Si estás leyendo este archivo desde Emacs, puedes colocar el cursor sobre los enlaces y presionar =Ctrl-c Ctrl-o= o ejecutar =Alt-x org-open-at-point= para abrir el enlace en tu navegador.
+
+* Sistema de paquetes
+
+Emacs tiene su propio controlador de paquetes pero este no hace facil automatizar la instalación de paquetes en un nuevo sistema. [[https://github.com/jwiegley/use-package][use-package]] es un paquete muy útil usado en esta configuración que hace mucho más facil el trabajo de automatizar la instalación y la configuración de todo lo que aquí usamos.
+
+#+begin_src emacs-lisp
+
+  ;; Inicializa la fuente de los paquetes
+  (require 'package)
+
+  (setq package-archives '(("melpa" . "https://melpa.org/packages/")
+                                       ("org" . "https://orgmode.org/elpa/")
+                                       ("elpa" . "https://elpa.gnu.org/packages/")))
+
+  (package-initialize)
+  (unless package-archive-contents
+    (package-refresh-contents))
+
+    ;; Inicializa use-package en plataformas no Linux
+  (unless (package-installed-p 'use-package)
+    (package-install 'use-package))
+
+  (require 'use-package)
+  (setq use-package-always-ensure t)
+
+#+end_src
+
+* Interfaz de usuario base
+
+Esta sección configura la base de la IU, remueve los elementos innecesarios para hacer que Emacs se vea mucho más minimalista y moderno. Si apenas empiezas con Emacs, la barra del menú podría ser de utilidad para ti, puedes remover =(menu-bar-mode -1)= del código si quieres conservarla.
+
+#+begin_src emacs-lisp
+
+  (setq inhibit-startup-message t)
+
+  (scroll-bar-mode -1)        ; Deshabilita la barra de desplazamiento
+  (tool-bar-mode -1)          ; Deshabilita la barra de herramientas
+  (tooltip-mode -1)            ; Desabilita los consejos
+  (set-fringe-mode 10)        ; Airea el espacio
+
+  (menu-bar-mode -1)         ; Deshabilita la barra de menú
+
+  ;; Campana visual
+  (setq visible-bell t)
+
+  (column-number-mode)
+  (global-display-line-numbers-mode t)
+
+  ;; Deshabilita la linea de números para algunos modos
+  (dolist (mode '(org-mode-hook
+                  term-mode-hook
+                  shell-mode-hook
+                  eshell-mode-hook))
+    (add-hook mode (lambda () (display-line-numbers-mode 0))))
+
+#+end_src
+
+** Fuentes
+
+#+begin_src emacs-lisp
+
+(set-face-attribute 'default nil :font mono-font :height default-font-size)
+
+;; Establecer la cara fija
+(set-face-attribute 'fixed-pitch nil :font mono-font :height default-font-size)
+
+;; Establecer la cara variable
+(set-face-attribute 'variable-pitch nil :font serif-font :height default-variable-font-size :weight 'regular)
+
+#+end_src
+
+* Mapeo de teclado
+
+Esta configuración usa [[https://evil.readthedocs.io/en/latest/index.html][evil-mode]] para una experiencia de edición modal con el mapeo de [[VI]]. Para facilitar la configuración de atajos utilizamos [[https://github.com/noctuid/general.el][general.el]] que se integra bien con [[which-key]]. Usamos [[https://github.com/emacs-evil/evil-collection][evil-collection]] para una configuración automática de mapeo en los diferentes modos.
+
+#+begin_src emacs-lisp
+
+  ;; Usar ESC para cerrar mensajes
+  (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
+
+  (use-package general
+    :config
+    (general-create-definer rune/leader-keys
+      :keymaps '(normal insert visual emacs)
+      :prefix "SPC"
+      :global-prefix "C-SPC")
+
+    (rune/leader-keys
+      "t"  '(:ignore t :which-key "toggles")
+      "tt" '(counsel-load-theme :which-key "choose theme")))
+
+  (use-package evil
+    :init
+    (setq evil-want-integration t)
+    (setq evil-want-keybinding nil)
+    (setq evil-want-C-u-scroll t)
+    (setq evil-want-C-i-jump nil)
+    :config
+    (evil-mode 1)
+    (define-key evil-insert-state-map (kbd "C-g") 'evil-normal-state)
+    (define-key evil-insert-state-map (kbd "C-h") 'evil-delete-backward-char-and-join)
+
+    ;; Usar movimientos del modo visual incluso fuera de búfers con visual-line-mode
+    (evil-global-set-key 'motion "j" 'evil-next-visual-line)
+    (evil-global-set-key 'motion "k" 'evil-previous-visual-line)
+
+    (evil-set-initial-state 'messages-buffer-mode 'normal)
+    (evil-set-initial-state 'dashboard-mode 'normal))
+
+  (use-package evil-collection
+    :after evil
+    :config
+    (evil-collection-init))
+
+#+end_src
+
+* Interfaz de usuario
+** Temas
+
+[[https://github.com/hlissner/emacs-doom-themes][doom-themes]] es una librería de temas de colores para emacs muy variada y con buen soporte de los diferentes modos. En el siguiente enlace podrás ver [[https://github.com/hlissner/emacs-doom-themes/tree/screenshots][fotos]] de los diferentes temas de la librería. Tambien puedes ejecutar =Alt-x counsel-load-theme= para elegir entre ellos facilmente.
+
+En esa configuración o uso el tema doom-hechicero es el tema doom-sourcerer con algunos retoques hechos por mi, en caso de que quieras usarlo deberas descargarlo y colocarlo en ~/.emacs.d/elpa/doom-themes~/doom-hechicero.el.
+
+#+begin_src emacs-lisp
+
+(use-package doom-themes
+  :init (load-theme 'doom-hechicero t))
+
+#+end_src
+
+** Fondo transparente
+
+Ten en cuenta que para que esta configuración tome efecto deberás tener un compositor instalado en tu sistema, yo uso [[picom]]; y deberás configurarlo correctamente para que la transparencia se aplique a Emacs.
+
+#+begin_src emacs-lisp
+
+  (set-frame-parameter (selected-frame) 'alpha '(95 98))
+  (add-to-list 'default-frame-alist '(alpha 95 98))
+
+#+end_src
+
+** Linea de modos
+
+[[https://github.com/seagle0128/doom-modeline][doom-modeline]] es una linea de modos (la linea con información del búfer que aparece debajo) estética y minimalista. Su configuración por defecto esta muy bien pero puedes mirar las [[https://github.com/seagle0128/doom-modeline#customize][opciones de configuración]] si quieres personalizarla aún más.
+
+~*NOTA:* Para usar esta configuración por primera vez necesitaras ejecutar =Alt-x all-the-icons-install-fonts= para que los iconos en la linea de modos se muestren correctamente.~
+
+#+begin_src emacs-lisp
+
+(use-package all-the-icons)
+
+(use-package doom-modeline
+  :init (doom-modeline-mode 1)
+  :custom ((doom-modeline-height 15)))
+
+#+end_src
+
+** Cuál tecla?
+
+[[https://github.com/justbur/emacs-which-key][which-key]] es un panel muy útil, que aparecerá cuando empieces a teclear atajos, para mostrarte todas las posibles completaciones del atajo que estás invocando. Por ejemplo, si presionas =Ctrl-c=, aparecerá un panel debajo mostrando todos los atajos relacionados con ese prefijo y que comandos ejecután. Esto es muy útil ya que es muy difícil recordar todos los atajos de memoria.
+
+#+begin_src emacs-lisp
+
+(use-package which-key
+  :init (which-key-mode)
+  :diminish which-key-mode
+  :config
+  (setq which-key-idle-delay 1))
+
+#+end_src
+
+** Completación automática
+
+[[https://oremacs.com/swiper/][Ivy]] es una excelente estructura de completación para Emacs. Provee un simple pero poderoso menú de selección que aparece cuando: abres archivos, cambias de búfer y otras tantas tareas. [[Counsel]] es un grupo de comandos que remplazan algunos comandos naturales de Emacs, ofreciendo opciones de completación para cada uno de los comandos, por ejemplo: 'find-file' por 'counsel-find-file'. 
+
+[[https://github.com/Yevgnen/ivy-rich][ivy-rich]] añade columnas extras a algunos de los paneles de comandos  [[Counsel]] para proveer más información sobre cada opción.
+
+#+begin_src emacs-lisp
+
+    (use-package ivy
+      :diminish
+      :bind (("C-s" . swiper)
+             :map ivy-minibuffer-map
+             ("TAB" . ivy-alt-done)
+             ("C-l" . ivy-alt-done)
+             ("C-j" . ivy-next-line)
+             ("C-k" . ivy-previous-line)
+             :map ivy-switch-buffer-map
+             ("C-k" . ivy-previous-line)
+             ("C-l" . ivy-done)
+             ("C-d" . ivy-switch-buffer-kill)
+             :map ivy-reverse-i-search-map
+             ("C-k" . ivy-previous-line)
+             ("C-d" . ivy-reverse-i-search-kill))
+      :config
+      (ivy-mode 1))
+
+    (use-package ivy-rich
+      :init
+      (ivy-rich-mode 1))
+
+    (use-package counsel
+      :bind (("C-M-j" . 'counsel-switch-buffer)
+             :map minibuffer-local-map
+             ("C-r" . 'counsel-minibuffer-history))
+      :config
+      (counsel-mode 1))
+
+#+end_src
+
+** Comandos de ayuda
+
+[[https://github.com/Wilfred/helpful][Helpful]] a añade mucha información útil a los comandos =describe-= de Emacs. Por ejemplo, si usas =describe-function= no solo verás la documentación de la función, obtendrás también el código fuente de la función y donde es aplicado en otras partes de la configuración Emacs. Es muy útil para comprender como funcionan las cosas dentro de Emacs.
+
+#+begin_src emacs-lisp
+
+  (use-package helpful
+    :custom
+    (counsel-describe-function-function #'helpful-callable)
+    (counsel-describe-variable-function #'helpful-variable)
+    :bind
+    ([remap describe-function] . counsel-describe-function)
+    ([remap describe-command] . helpful-command)
+    ([remap describe-variable] . counsel-describe-variable)
+    ([remap describe-key] . helpful-key))
+
+#+end_src
+
+** Escalado de texto
+
+Con [[https://github.com/abo-abo/hydra][Hydra]] podemos designar un atajo de teclado para ajustar el tamaño de la letra rápidamente. Aquí definimos que [[https://github.com/abo-abo/hydra][Hydra]] está ligado a =Ctrl-s t s= y una vez es activado, =j= y =k= incrementan y decrementan el tamaño del texto. Puedes apretar cualquier otra tecla para salir, aunque =f= sea la tecla definida para tal función.
+
+#+begin_src emacs-lisp
+
+  (use-package hydra)
+
+  (defhydra hydra-text-scale (:timeout 4)
+    "scale text"
+    ("j" text-scale-increase "in")
+    ("k" text-scale-decrease "out")
+    ("f" nil "finished" :exit t))
+
+  (rune/leader-keys
+    "ts" '(hydra-text-scale/body :which-key "scale text"))
+
+#+end_src
+
+* Modo Org
+
+[[https://orgmode.org/][Org Mode]] es uno de los sellos de Emacs. Es un muy rico editor de documentos, planificador, organizador de tareas, motor de blogeo y utilidad de codigo literal, todo dentro de un mismo paquete.
+
+** Tipografía mejorada
+
+La función =org-font-setup= configura varias formas de texto  para modificar los tamaños de los  títulos y modificar el grosor de las tipografías, para que paresca que estamos editando un documento en =org-mode= y sea más estético y leible. Cambiamos de nuevo a mono fuentes para los bloques de código y tablas, para que se muestren correctamente.
+
+#+begin_src emacs-lisp
+
+  (defun org-font-setup ()
+    ;; Reemplaza el simbolo de guión con un punto, en las listas.
+    (font-lock-add-keywords 'org-mode
+                            '(("^ *\\([-]\\) "
+                               (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+
+    ;; Establece los tamaños y fuente de los títulos.
+    (dolist (face '((org-level-1 . 1.3)
+                    (org-level-2 . 1.2)
+                    (org-level-3 . 1.1)
+                    (org-level-4 . 1.0)
+                    (org-level-5 . 0.9)
+                    (org-level-6 . 0.9)
+                    (org-level-7 . 0.9)
+                    (org-level-8 . 0.9)))
+      (set-face-attribute (car face) nil :font "Oxygen" :weight 'regular :height (cdr face)))
+
+    ;; Asegura que todo lo que debe mostrarse en monofuente se vea correctamente.
+    (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
+    (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
+    (set-face-attribute 'org-table nil   :inherit '(shadow fixed-pitch))
+    (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
+    (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
+    (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
+    (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch))
+
+#+end_src
+
+** Iconos de títulos
+
+[[https://github.com/sabof/org-bullets][org-bullets]] reemplaza los asteriscos de los títulos en los búfers =org-mode= por mejores símbolos que puedes personalisar. Otra opción diferente es usar [[https://github.com/integral-dw/org-superstar-mode][org-superstar-mode]].
+
+#+begin_src emacs-lisp
+
+  (use-package org-bullets
+    :hook (org-mode . org-bullets-mode))
+
+#+end_src
+
+** Centrar texto
+
+Usamos [[https://github.com/joostkremers/visual-fill-column][visual-fill-column]] para centrar los búfers =org-mode= para una visión más estética, que da una mejor experiencia de escritura ya que centra el contenido del búfer horaizontalmente, para que paresca más como un documento. Esto es una cuestión de gustos, puedes remover el bloque si no te gusta.
+
+#+begin_src emacs-lisp
+
+  (defun efs/org-mode-visual-fill ()
+    (setq visual-fill-column-width 100
+          visual-fill-column-center-text t)
+    (visual-fill-column-mode 1))
+
+  (use-package visual-fill-column
+    :hook (org-mode . efs/org-mode-visual-fill))
+
+#+end_src
+
+** Configuración básica
+
+Esta sección contiene la configuración básica de =org-mode=, más la configuración de la agenda Org y las plantillas de captura. Hay muchas cosas que entender sobre esta configuración y sobre el modo Org, recomiendo ver estos videos: [[https://youtu.be/VcgjTEa0kU4][1]] y [[https://youtu.be/PNE-mgkZ6HM][2]] para comprender mejor la extención de esta configuración.
+
+#+begin_src emacs-lisp
+
+  (defun org-mode-setup ()
+    (org-indent-mode)
+    (variable-pitch-mode 1)
+    (visual-line-mode 1))
+
+  (use-package org
+    :hook (org-mode . org-mode-setup)
+    :config
+    (setq org-ellipsis " ▾")
+
+    (setq org-agenda-start-with-log-mode t)
+    (setq org-log-done 'time)
+    (setq org-log-into-drawer t)
+
+    (setq org-agenda-files
+          '("~/Projects/Code/emacs-from-scratch/OrgFiles/Tasks.org"
+            "~/Projects/Code/emacs-from-scratch/OrgFiles/Habits.org"
+            "~/Projects/Code/emacs-from-scratch/OrgFiles/Birthdays.org"))
+
+    (require 'org-habit)
+    (add-to-list 'org-modules 'org-habit)
+    (setq org-habit-graph-column 60)
+
+    (setq org-todo-keywords
+      '((sequence "TODO(t)" "NEXT(n)" "|" "DONE(d!)")
+        (sequence "BACKLOG(b)" "PLAN(p)" "READY(r)" "ACTIVE(a)" "REVIEW(v)" "WAIT(w@/!)" "HOLD(h)" "|" "COMPLETED(c)" "CANC(k@)")))
+
+    (setq org-refile-targets
+      '(("Archive.org" :maxlevel . 1)
+        ("Tasks.org" :maxlevel . 1)))
+
+    ;; Guardar búfers org al modificarlos!
+    (advice-add 'org-refile :after 'org-save-all-org-buffers)
+
+    (setq org-tag-alist
+      '((:startgroup)
+         ; Pon etiquetas diferenciables aquí.
+         (:endgroup)
+         ("@errand" . ?E)
+         ("@home" . ?H)
+         ("@work" . ?W)
+         ("agenda" . ?a)
+         ("planning" . ?p)
+         ("publish" . ?P)
+         ("batch" . ?b)
+         ("note" . ?n)
+         ("idea" . ?i)))
+
+    ;; Configure custom agenda views
+    (setq org-agenda-custom-commands
+     '(("d" "Dashboard"
+       ((agenda "" ((org-deadline-warning-days 7)))
+        (todo "NEXT"
+          ((org-agenda-overriding-header "Next Tasks")))
+        (tags-todo "agenda/ACTIVE" ((org-agenda-overriding-header "Active Projects")))))
+
+      ("n" "Next Tasks"
+       ((todo "NEXT"
+          ((org-agenda-overriding-header "Next Tasks")))))
+
+      ("W" "Work Tasks" tags-todo "+work-email")
+
+      ;; Low-effort next actions
+      ("e" tags-todo "+TODO=\"NEXT\"+Effort<15&+Effort>0"
+       ((org-agenda-overriding-header "Low Effort Tasks")
+        (org-agenda-max-todos 20)
+        (org-agenda-files org-agenda-files)))
+
+      ("w" "Workflow Status"
+       ((todo "WAIT"
+              ((org-agenda-overriding-header "Waiting on External")
+               (org-agenda-files org-agenda-files)))
+        (todo "REVIEW"
+              ((org-agenda-overriding-header "In Review")
+               (org-agenda-files org-agenda-files)))
+        (todo "PLAN"
+              ((org-agenda-overriding-header "In Planning")
+               (org-agenda-todo-list-sublevels nil)
+               (org-agenda-files org-agenda-files)))
+        (todo "BACKLOG"
+              ((org-agenda-overriding-header "Project Backlog")
+               (org-agenda-todo-list-sublevels nil)
+               (org-agenda-files org-agenda-files)))
+        (todo "READY"
+              ((org-agenda-overriding-header "Ready for Work")
+               (org-agenda-files org-agenda-files)))
+        (todo "ACTIVE"
+              ((org-agenda-overriding-header "Active Projects")
+               (org-agenda-files org-agenda-files)))
+        (todo "COMPLETED"
+              ((org-agenda-overriding-header "Completed Projects")
+               (org-agenda-files org-agenda-files)))
+        (todo "CANC"
+              ((org-agenda-overriding-header "Cancelled Projects")
+               (org-agenda-files org-agenda-files)))))))
+
+    (setq org-capture-templates
+      `(("t" "Tasks / Projects")
+        ("tt" "Task" entry (file+olp "~/Projects/Code/emacs-from-scratch/OrgFiles/Tasks.org" "Inbox")
+             "* TODO %?\n  %U\n  %a\n  %i" :empty-lines 1)
+
+        ("j" "Journal Entries")
+        ("jj" "Journal" entry
+             (file+olp+datetree "~/Projects/Code/emacs-from-scratch/OrgFiles/Journal.org")
+             "\n* %<%I:%M %p> - Journal :journal:\n\n%?\n\n"
+             ;; ,(dw/read-file-as-string "~/Notes/Templates/Daily.org")
+             :clock-in :clock-resume
+             :empty-lines 1)
+        ("jm" "Meeting" entry
+             (file+olp+datetree "~/Projects/Code/emacs-from-scratch/OrgFiles/Journal.org")
+             "* %<%I:%M %p> - %a :meetings:\n\n%?\n\n"
+             :clock-in :clock-resume
+             :empty-lines 1)
+
+        ("w" "Workflows")
+        ("we" "Checking Email" entry (file+olp+datetree "~/Projects/Code/emacs-from-scratch/OrgFiles/Journal.org")
+             "* Checking Email :email:\n\n%?" :clock-in :clock-resume :empty-lines 1)
+
+        ("m" "Metrics Capture")
+        ("mw" "Weight" table-line (file+headline "~/Projects/Code/emacs-from-scratch/OrgFiles/Metrics.org" "Weight")
+         "| %U | %^{Weight} | %^{Notes} |" :kill-buffer t)))
+
+    (define-key global-map (kbd "C-c j")
+      (lambda () (interactive) (org-capture nil "jj")))
+
+    (org-font-setup))
+
+#+end_src
+
+** Configuración Babel
+
+Para ejecutar o exportar bloques de codigo en =org-mode=, tendrás que configurar =org-babel-load-languages= para cada lengauje que quieras usar.  [[https://orgmode.org/worg/org-contrib/babel/languages.html][Esta página]] documenta todos los lenguajes que puedes usar con =org-babel=.
+
+#+begin_src emacs-lisp
+
+  (org-babel-do-load-languages
+    'org-babel-load-languages
+    '((emacs-lisp . t)
+      (python . t)))
+
+  (push '("conf-unix" . conf-unix) org-src-lang-modes)
+
+#+end_src
+
+** Enrredo automático 
+
+Este fragmento añade un gancho a los búfers que quieras de =org-mode= para que =org-babel-tangle-config= sea ejecutado cada vez que el búfer sea guardado. Esta función revisa si el archivo org que estamos guardando es el especificado y si es así automáticamente exporta la configuración al archivo asociado.
+
+#+begin_src emacs-lisp
+
+  ;; Enrreda automáticamente nuestro archivo emacs.org al guardar.
+  (defun org-babel-tangle-config ()
+    (when (string-equal (buffer-file-name)
+                        (expand-file-name "~/config/emacs.org"))
+      ;; Dynamic scoping to the rescue
+      (let ((org-confirm-babel-evaluate nil))
+        (org-babel-tangle))))
+
+  (add-hook 'org-mode-hook (lambda () (add-hook 'after-save-hook #'org-babel-tangle-config)))
+
+#+end_src
+
+** Roam-Org
+
+#+begin_src emacs-lisp
+
+  (use-package org-roam
+    :ensure t
+    :init
+    (setq org-roam-v2-ack t)
+    :custom
+    (org-roam-directory "~/wiki")
+    :bind (("C-c n l" . org-roam-buffer-toggle)
+          ("C-c n f" . org-roam-node-find)
+          ("C-c n i" . org-roam-node-insert))
+    :config
+    (org-roam-setup))
+
+#+end_src
+
+* Desarrollo
+** Lenguajes
+*** Entorno de Desarrollo Integrado con lsp
+**** lsp-mode
+
+Usamos el excelente [[https://emacs-lsp.github.io/lsp-mode/][lsp-mode]] para habilitar Entornos de Desarrollo Integrados para diferentes lenguajes dentro de Emacs a través de los "servidores de lenguajes" que hablan el [[https://microsoft.github.io/language-server-protocol/][Protocolo de Servidor de Lenguaje]]. Antes de intentar configurar =lsp-mode= para algún lenguaje, mira la [[https://emacs-lsp.github.io/lsp-mode/page/languages/][documentación para tu lenguaje]] para que puedas ver cuales servidores de lenguajes estan disponibles y como instalarlos.
+
+La configuración =lsp-keymap-prefix= te permite definir un prefijo a los atajos de teclados normales de =lsp-mode=. Es *altamente recomendable* usar el prefijo, para así descubrir lo que puedes hacer con =lsp-mode= en un búfer.
+
+La integración =which-key= añade descripciones muy útiles de los diferentes atajos, por ello deberías ser capaz de aprender las funcionalidades presionando =C-c l= en un búfer =lsp-mode= y probando las diferentes opciones que allí encontraras.
+
+#+begin_src emacs-lisp
+
+  (defun lsp-mode-setup ()
+    (setq lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
+    (lsp-headerline-breadcrumb-mode))
+
+  (use-package lsp-mode
+    :commands (lsp lsp-deferred)
+    :hook (lsp-mode . lsp-mode-setup)
+    :init
+    (setq lsp-keymap-prefix "C-c l")  ;; Or 'C-l', 's-l'
+    :config
+    (lsp-enable-which-key-integration t))
+
+#+end_src
+
+**** lsp-ui
+
+[[https://emacs-lsp.github.io/lsp-ui/][lsp-ui]] es un conjunto de mejoras de interfaz construido encima de =lsp-mode= que aumenta la sensación de Entorno de Desarrollo Integrado en Emacs. Mira las capturas de pantalla en la página de  =lsp-ui=, para ver ejemplo de lo que es capaz de hacer.
+
+#+begin_src emacs-lisp
+
+  (use-package lsp-ui
+    :hook (lsp-mode . lsp-ui-mode)
+    :custom
+    (lsp-ui-doc-position 'bottom))
+
+#+end_src
+
+**** lsp-treemacs
+
+[[https://github.com/emacs-lsp/lsp-treemacs][lsp-treemacs]] provee vistas de árbol para los diferentes aspectos de tu código como: simbolos en un archivo, referencias de un simbolo, o mensajes de diagnostico (errores y advertencias) que se encuentran en tu código.
+
+Prueba ejecutar estos comandos con =Alt-x=:
+
+- =lsp-treemacs-symbols= - Vista de árbol de los simbolos en el archivo áctual
+- =lsp-treemacs-references= - Vista de árbol  para las referencias de el simbolo bajo el cursor
+- =lsp-treemacs-error-list= - Vista de árbol para los mensajes de diagnostico en el proyecto
+
+Este paquete está construido dentro del paquete de  [[https://github.com/Alexander-Miller/treemacs][treemacs]] el cual puede ser de algún interes para ti, si gustas de tener un explorador de archivos en el lado izquierdo de la pantalla del editor.
+
+#+begin_src emacs-lisp
+
+  (use-package lsp-treemacs
+    :after lsp)
+
+#+end_src
+
+**** lsp-ivy
+
+[[https://github.com/emacs-lsp/lsp-ivy][lsp-ivy]] integra Ivy con =lsp-mode= para facilitar la búsqueda por nombre de cosas en tu código. Cuando ejecutas estos comandos, un mensaje aparecera en el minibúfer permitiendote escribir parte del nombre de un símbolo en tu código; los resultados irán apareciendo para que así puedas encontrar lo que estás buscando y saltar a esa parte del código al seleccionar una de las opciones.
+
+
+Prueba ejecutar estos comandos con =Alt-x=:
+
+- =lsp-ivy-workspace-symbol= - Busqueda por nombre de símbolo en el espacio de trabajo actual
+- =lsp-ivy-global-workspace-symbol= - Busqueda por nombre de símbolo en todos los proyectos activos
+
+#+begin_src emacs-lisp
+
+  (use-package lsp-ivy)
+
+#+end_src
+
+*** TypeScript
+
+Esto es una configuración básica para el lenguaje de TypeScript, para que los archivos =.ts= activen =typescript-mode= cuando sean abiertos. También estamos añadiendo un gancho a =typescript-mode-hook= para llamar a =lsp-deferred= para activar el =lsp-mode= para tener el (protocolo de servidor de lenguaje) cada vez que editemos código TypeScript.
+
+#+begin_src emacs-lisp
+
+  (use-package typescript-mode
+    :mode "\\.ts\\'"
+    :hook (typescript-mode . lsp-deferred)
+    :config
+    (setq typescript-indent-level 2))
+
+#+end_src
+
+~NOTA: para que =lsp-mode= funcione con TypeScript (y JavaScript) tendrás que installar un servidor del lenguaje en tu maquina. Si tienes Node.js instalado, la forma más fácil de instalarlo es con el comando:~
+
+#+begin_src shell :tangle no
+
+npm install -g typescript-language-server typescript
+
+#+end_src
+
+~Esto instalara el~ [[https://github.com/theia-ide/typescript-language-server][typescript-language-server]] ~y el compilador de TypeScript~
+
+** Modo Company
+
+El [[http://company-mode.github.io/][Modo Company]] provee una interface de completación en el búfer mejor que =completion-at-point=, es más similar a lo que esperarias de un Entorno de Desarrollo Integrado. Añadimos una simple configuración para que el mapeo del teclado sea un poco mejor (=TAB= ahora completa la selección y inicia completación en el punto si es necesaria)
+
+También usamos   [[https://github.com/sebastiencs/company-box][company-box]] para mejorar aún más la apariencia de la completación con iconos y mejor presentación.
+
+#+begin_src emacs-lisp
+
+  (use-package company
+    :after lsp-mode
+    :hook (lsp-mode . company-mode)
+    :bind (:map company-active-map
+           ("<tab>" . company-complete-selection))
+          (:map lsp-mode-map
+           ("<tab>" . company-indent-or-complete-common))
+    :custom
+    (company-minimum-prefix-length 1)
+    (company-idle-delay 0.0))
+
+  (use-package company-box
+    :hook (company-mode . company-box-mode))
+
+#+end_src
+
+** Projectile
+
+[[https://projectile.mx/][Projectile]] es una librería de control de proyectos para Emacs que hace mucho más fácil navegar atravez de varios proyectos de código. Muchos paquetes ya se integran a [[https://projectile.mx/][Projectile]] es una buena idea tenerlo instalado incluso si no usas sus comandos directamente.
+
+#+begin_src emacs-lisp
+
+  (use-package projectile
+    :diminish projectile-mode
+    :config (projectile-mode)
+    :custom ((projectile-completion-system 'ivy))
+    :bind-keymap
+    ("C-c p" . projectile-command-map)
+    :init
+    ;; NOTA: Establece aquí la dirección de tus repositorios Git!
+    (when (file-directory-p "~/Projects/Code")
+      (setq projectile-project-search-path '("~/Projects/Code")))
+    (setq projectile-switch-project-action #'projectile-dired))
+
+  (use-package counsel-projectile
+    :config (counsel-projectile-mode))
+
+#+end_src
+
+** Magit
+
+[[https://magit.vc/][Magit]] es la interfaz de Git de Emacs y otro de sus sellos; las operaciones son fáciles y rápidas de ejecutar usando su panel de comandos.
+
+~NOTA: debes tener Git instalado y configurado en tu máquina para poder usar Magit~
+
+#+begin_src emacs-lisp
+
+  (use-package magit
+    :custom
+    (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
+
+  ;; NOTE: Make sure to configure a GitHub token before using this package!
+  ;; - https://magit.vc/manual/forge/Token-Creation.html#Token-Creation
+  ;; - https://magit.vc/manual/ghub/Getting-Started.html#Getting-Started
+  (use-package forge)
+
+#+end_src
+
+** Delimitadores arcoiris
+
+[[https://github.com/Fanael/rainbow-delimiters][rainbow-delimiters]] coloriza los nidos de parentesís y corchetes dependiendo de su profundidad. Esto hace más visual encontrar las parejas de parentesís cuando programas.
+
+#+begin_src emacs-lisp
+
+  (use-package rainbow-delimiters 
+    :hook (prog-mode . rainbow-delimiters-mode))
+
+#+end_src
